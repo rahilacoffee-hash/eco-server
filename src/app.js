@@ -18,26 +18,75 @@ const app = express();
 
 /*
 |--------------------------------------------------------------------------
-| CONFIGURATION
+| CORS CONFIGURATION
 |--------------------------------------------------------------------------
 */
+
+const normalizeOrigin = (origin) => {
+  return String(origin || "")
+    .trim()
+    .replace(/\/$/, "");
+};
 
 const allowedOrigins = [
   "http://localhost:5173",
   "https://ecohomeconcepts.vercel.app",
-  ...String(process.env.CLIENT_URL || process.env.FRONTEND_URL || "")
+
+  ...String(
+    process.env.CLIENT_URL ||
+      process.env.FRONTEND_URL ||
+      ""
+  )
     .split(",")
-    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .map(normalizeOrigin)
     .filter(Boolean),
-];
+].map(normalizeOrigin);
+
+/*
+|--------------------------------------------------------------------------
+| CHECK ALLOWED ORIGIN
+|--------------------------------------------------------------------------
+*/
 
 const isAllowedOrigin = (origin) => {
-  const normalisedOrigin = origin.replace(/\/$/, "");
+  if (!origin) {
+    return true;
+  }
 
-  return (
-    allowedOrigins.includes(normalisedOrigin) ||
-    /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalisedOrigin)
-  );
+  const normalizedOrigin = normalizeOrigin(origin);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Exact matches
+  |--------------------------------------------------------------------------
+  */
+
+  if (allowedOrigins.includes(normalizedOrigin)) {
+    return true;
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Allow Vercel deployments
+  |--------------------------------------------------------------------------
+  |
+  | Examples:
+  |
+  | https://ecohomeconcepts.vercel.app
+  | https://ecohomeconcepts-git-main.vercel.app
+  | https://ecohomeconcepts-abc123.vercel.app
+  |
+  */
+
+  if (
+    /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(
+      normalizedOrigin
+    )
+  ) {
+    return true;
+  }
+
+  return false;
 };
 
 /*
@@ -49,13 +98,34 @@ const isAllowedOrigin = (origin) => {
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || isAllowedOrigin(origin)) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 
-      return callback(new Error("Origin not allowed by CORS"));
+      console.warn(
+        `Blocked CORS origin: ${origin}`
+      );
+
+      return callback(
+        new Error("Origin not allowed by CORS")
+      );
     },
+
     credentials: true,
+
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
   })
 );
 
@@ -66,7 +136,12 @@ app.use(
 */
 
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+app.use(
+  express.urlencoded({
+    extended: true,
+  })
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -82,11 +157,12 @@ app.use(cookieParser());
 |--------------------------------------------------------------------------
 */
 
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
   return res.status(200).json({
     success: true,
     message: "Ecohome API is running 🚀",
-    environment: process.env.NODE_ENV || "development",
+    environment:
+      process.env.NODE_ENV || "development",
   });
 });
 
@@ -96,7 +172,7 @@ app.get("/", (req, res) => {
 |--------------------------------------------------------------------------
 */
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", (_req, res) => {
   return res.status(200).json({
     success: true,
     message: "Ecohome API is running",
@@ -119,9 +195,13 @@ app.use("/api/auth", authRoutes);
 */
 
 app.use("/api/contact", contactRoutes);
+
 app.use("/api/homepage", homepageRoutes);
+
 app.use("/api/projects", projectRoutes);
+
 app.use("/api/services", serviceRoutes);
+
 app.use("/api/testimonials", testimonialRoutes);
 
 /*
@@ -130,11 +210,30 @@ app.use("/api/testimonials", testimonialRoutes);
 |--------------------------------------------------------------------------
 */
 
-app.use("/api/admin/projects", adminProjectRoutes);
-app.use("/api/admin/services", adminServiceRoutes);
-app.use("/api/admin/testimonials", adminTestimonialRoutes);
-app.use("/api/admin/dashboard", adminDashboardRoutes);
-app.use("/api/admin/contacts", adminContactRoutes);
+app.use(
+  "/api/admin/projects",
+  adminProjectRoutes
+);
+
+app.use(
+  "/api/admin/services",
+  adminServiceRoutes
+);
+
+app.use(
+  "/api/admin/testimonials",
+  adminTestimonialRoutes
+);
+
+app.use(
+  "/api/admin/dashboard",
+  adminDashboardRoutes
+);
+
+app.use(
+  "/api/admin/contacts",
+  adminContactRoutes
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -156,51 +255,73 @@ app.use((req, res) => {
 |--------------------------------------------------------------------------
 */
 
-app.use((error, _req, res, _next) => {
-  /*
-  |--------------------------------------------------------------------------
-  | MULTER FILE SIZE ERROR
-  |--------------------------------------------------------------------------
-  */
+app.use(
+  (error, _req, res, _next) => {
+    /*
+    |--------------------------------------------------------------------------
+    | MULTER FILE SIZE
+    |--------------------------------------------------------------------------
+    */
 
-  if (
-    error.name === "MulterError" &&
-    error.code === "LIMIT_FILE_SIZE"
-  ) {
-    return res.status(400).json({
+    if (
+      error.name === "MulterError" &&
+      error.code === "LIMIT_FILE_SIZE"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Image must be 10 MB or smaller",
+      });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | INVALID IMAGE TYPE
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      error.message ===
+      "Only JPG, PNG, WEBP, and GIF images are allowed"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CORS ERROR
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      error.message ===
+      "Origin not allowed by CORS"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Origin not allowed",
+      });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | UNKNOWN ERROR
+    |--------------------------------------------------------------------------
+    */
+
+    console.error(
+      "Unhandled request error:",
+      error
+    );
+
+    return res.status(500).json({
       success: false,
-      message: "Image must be 10 MB or smaller",
+      message: "Unable to process request",
     });
   }
-
-  /*
-  |--------------------------------------------------------------------------
-  | INVALID IMAGE TYPE
-  |--------------------------------------------------------------------------
-  */
-
-  if (
-    error.message ===
-    "Only JPG, PNG, WEBP, and GIF images are allowed"
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
-
-  /*
-  |--------------------------------------------------------------------------
-  | UNKNOWN ERROR
-  |--------------------------------------------------------------------------
-  */
-
-  console.error("Unhandled request error:", error);
-
-  return res.status(500).json({
-    success: false,
-    message: "Unable to process request",
-  });
-});
+);
 
 export default app;
