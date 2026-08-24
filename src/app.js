@@ -34,7 +34,7 @@ app.use(cookieParser());
 |--------------------------------------------------------------------------
 */
 
-app.get("/api/health", (req, res) => {
+app.get("/api", (req, res) => {
   res.status(200).json({
     success: true,
     message: "Ecohome API is running",
