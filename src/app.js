@@ -14,19 +14,60 @@ import adminDashboardRoutes from "./routes/adminDashboard.Routes.js";
 import homepageRoutes from "./routes/homepage.Routes.js";
 import adminContactRoutes from "./routes/adminContact.Routes.js";
 
-
 const app = express();
+
+/*
+|--------------------------------------------------------------------------
+| CONFIGURATION
+|--------------------------------------------------------------------------
+*/
+
+const allowedOrigin =
+  process.env.CLIENT_URL || "http://localhost:5173";
+
+/*
+|--------------------------------------------------------------------------
+| CORS
+|--------------------------------------------------------------------------
+*/
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: allowedOrigin,
     credentials: true,
   })
 );
 
+/*
+|--------------------------------------------------------------------------
+| BODY PARSERS
+|--------------------------------------------------------------------------
+*/
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+/*
+|--------------------------------------------------------------------------
+| COOKIES
+|--------------------------------------------------------------------------
+*/
+
 app.use(cookieParser());
+
+/*
+|--------------------------------------------------------------------------
+| ROOT
+|--------------------------------------------------------------------------
+*/
+
+app.get("/", (req, res) => {
+  return res.status(200).json({
+    success: true,
+    message: "Ecohome API is running 🚀",
+    environment: process.env.NODE_ENV || "development",
+  });
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -34,10 +75,11 @@ app.use(cookieParser());
 |--------------------------------------------------------------------------
 */
 
-app.get("/api", (req, res) => {
-  res.status(200).json({
+app.get("/api/health", (req, res) => {
+  return res.status(200).json({
     success: true,
     message: "Ecohome API is running",
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -51,41 +93,93 @@ app.use("/api/auth", authRoutes);
 
 /*
 |--------------------------------------------------------------------------
-| PUBLIC
+| PUBLIC ROUTES
 |--------------------------------------------------------------------------
 */
 
 app.use("/api/contact", contactRoutes);
 app.use("/api/homepage", homepageRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api/services", serviceRoutes);
+app.use("/api/testimonials", testimonialRoutes);
 
 /*
 |--------------------------------------------------------------------------
-| ADMIN
+| ADMIN ROUTES
 |--------------------------------------------------------------------------
 */
 
 app.use("/api/admin/projects", adminProjectRoutes);
-
-app.use("/api/services", serviceRoutes);
 app.use("/api/admin/services", adminServiceRoutes);
-
-app.use("/api/testimonials", testimonialRoutes);
 app.use("/api/admin/testimonials", adminTestimonialRoutes);
 app.use("/api/admin/dashboard", adminDashboardRoutes);
 app.use("/api/admin/contacts", adminContactRoutes);
 
+/*
+|--------------------------------------------------------------------------
+| 404 HANDLER
+|--------------------------------------------------------------------------
+*/
+
+app.use((req, res) => {
+  return res.status(404).json({
+    success: false,
+    message: "Route not found",
+    path: req.originalUrl,
+  });
+});
+
+/*
+|--------------------------------------------------------------------------
+| GLOBAL ERROR HANDLER
+|--------------------------------------------------------------------------
+*/
+
 app.use((error, _req, res, _next) => {
-  if (error.name === "MulterError" && error.code === "LIMIT_FILE_SIZE") {
-    return res.status(400).json({ success: false, message: "Image must be 10 MB or smaller" });
+  /*
+  |--------------------------------------------------------------------------
+  | MULTER FILE SIZE ERROR
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    error.name === "MulterError" &&
+    error.code === "LIMIT_FILE_SIZE"
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Image must be 10 MB or smaller",
+    });
   }
 
-  if (error.message === "Only JPG, PNG, WEBP, and GIF images are allowed") {
-    return res.status(400).json({ success: false, message: error.message });
+  /*
+  |--------------------------------------------------------------------------
+  | INVALID IMAGE TYPE
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    error.message ===
+    "Only JPG, PNG, WEBP, and GIF images are allowed"
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | UNKNOWN ERROR
+  |--------------------------------------------------------------------------
+  */
 
   console.error("Unhandled request error:", error);
-  return res.status(500).json({ success: false, message: "Unable to process request" });
+
+  return res.status(500).json({
+    success: false,
+    message: "Unable to process request",
+  });
 });
 
 export default app;
