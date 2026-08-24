@@ -31,6 +31,15 @@ const allowedOrigins = [
     .filter(Boolean),
 ];
 
+const isAllowedOrigin = (origin) => {
+  const normalisedOrigin = origin.replace(/\/$/, "");
+
+  return (
+    allowedOrigins.includes(normalisedOrigin) ||
+    /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalisedOrigin)
+  );
+};
+
 /*
 |--------------------------------------------------------------------------
 | CORS
@@ -40,7 +49,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+      if (!origin || isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 
