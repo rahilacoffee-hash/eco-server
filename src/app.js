@@ -22,8 +22,14 @@ const app = express();
 |--------------------------------------------------------------------------
 */
 
-const allowedOrigin =
-  process.env.CLIENT_URL || "http://localhost:5173";
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://ecohomeconcepts.vercel.app",
+  ...String(process.env.CLIENT_URL || process.env.FRONTEND_URL || "")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .filter(Boolean),
+];
 
 /*
 |--------------------------------------------------------------------------
@@ -33,7 +39,13 @@ const allowedOrigin =
 
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin not allowed by CORS"));
+    },
     credentials: true,
   })
 );
