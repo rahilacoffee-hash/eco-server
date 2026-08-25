@@ -11,6 +11,11 @@ export const defaultHomepageContent = {
     secondaryButtonLabel: "View Projects",
     secondaryButtonHref: "/projects",
     backgroundImage: "",
+    clientLogos: [
+      { name: "Government Agency", logo: "https://res.cloudinary.com/dwwsz3kss/image/upload/v1762350040/icv-ng/mz2r056dgzmrpifiht9k.png" },
+      { name: "Commercial Developer", logo: "https://res.cloudinary.com/dwwsz3kss/image/upload/v1762345105/icv-ng/njdolvlmewbdgi4p0gum.png" },
+      { name: "Infrastructure Partner", logo: "https://res.cloudinary.com/dwwsz3kss/image/upload/v1762343617/icv-ng/ghqfzckzzkzj1b3kwtzu.png" },
+    ],
   },
   stats: [
     { value: 150, suffix: "+", label: "Projects Completed", icon: "Building" },
